@@ -15,7 +15,8 @@ stages:
   jobs:
   - job: Branch_Check
     displayName: 'Resolve Image Version'
-    pool: 'hsn-shost-agent'
+    pool:
+      name: 'test-one'
     steps:
     - bash: |
         set -e
@@ -90,7 +91,8 @@ stages:
   - job: Docker_Build_Push
     displayName: 'Docker Build & Push'
     dependsOn: Branch_Check
-    pool: 'hsn-shost-agent'
+    pool:
+      name: 'test-one'
     condition: and(
       succeeded(),
       eq(dependencies.Branch_Check.outputs['CheckBranch.STOP_PIPELINE'], 'false'),
