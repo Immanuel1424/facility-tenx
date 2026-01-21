@@ -1,0 +1,11 @@
+---
+alwaysApply: true
+---
+
+- Flutter stable
+- Material 3
+- Clean Architecture
+- BLoC state management
+- One global theme file
+- No inline styling in screens
+- Works for mobile + web

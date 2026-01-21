@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "859031041738",
+    "project_id": "tenx-bf726",
+    "storage_bucket": "tenx-bf726.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:859031041738:android:22c4dd1fde7f1e9434a633",
+        "android_client_info": {
+          "package_name": "com.example.facility_erp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCsowrA4-FKjTM22XdDETDhHT4nkiFr_DU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

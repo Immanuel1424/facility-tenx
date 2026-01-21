@@ -1,0 +1,88 @@
+# Dependencies
+node_modules
+npm-debug.log
+yarn-error.log
+yarn.lock
+# Note: package-lock.json is REQUIRED for npm ci - do NOT exclude it
+
+# Build outputs
+dist
+*.tsbuildinfo
+build
+
+# Environment files
+.env
+.env.local
+.env.*.local
+.env.production
+.env.development
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings
+
+# OS
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Documentation (exclude all markdown except README)
+*.md
+!README.md
+
+# Test files
+*.test.ts
+*.spec.ts
+test
+tests
+__tests__
+coverage
+.nyc_output
+
+# Scripts (exclude development scripts, migrations handled separately)
+scripts/*
+!scripts/run-migration.ts
+!scripts/run-pending-migrations.ts
+!scripts/migrations/
+
+# Uploads (will be mounted as volume, don't copy into image)
+uploads/*
+!uploads/.gitkeep
+
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# Misc
+.cache
+.temp
+tmp
+*.tmp
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Excel files (schema documentation)
+*.xlsx
+*.xls
+
+# Docker files (don't copy into image)
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+

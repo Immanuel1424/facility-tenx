@@ -1,0 +1,167 @@
+---
+title: Presentation Layer Architecture
+---
+
+flowchart TB
+    subgraph "Presentation Layer - UI & State"
+        direction TB
+        
+        subgraph "Pages"
+            PAGE[Page Widgets<br/>Route Handlers<br/>Navigation]
+        end
+        
+        subgraph "Widgets"
+            COMPOSITE[Composite Widgets<br/>Feature-Specific]
+            SHARED_W[Shared Widgets<br/>Reusable Components]
+            FORM[Form Widgets<br/>flutter_form_builder<br/>Validation]
+        end
+        
+        subgraph "Controllers/Notifiers"
+            CTRL[State Controllers<br/>Riverpod Notifiers<br/>BLoC/Provider]
+            FORM_CTRL[Form Controllers<br/>Form State Management]
+        end
+        
+        subgraph "State"
+            STATE[State Classes<br/>freezed/equatable<br/>Immutable]
+            LOADING[Loading State]
+            ERROR[Error State]
+            SUCCESS[Success State]
+        end
+        
+        PAGE --> COMPOSITE
+        PAGE --> SHARED_W
+        COMPOSITE --> FORM
+        COMPOSITE --> CTRL
+        FORM --> FORM_CTRL
+        CTRL --> STATE
+        STATE --> LOADING
+        STATE --> ERROR
+        STATE --> SUCCESS
+    end
+    
+    subgraph "UI Patterns"
+        RESPONSIVE[Responsive Layout<br/>LayoutBuilder<br/>Mobile: List<br/>Tablet: Grid]
+        FEEDBACK[User Feedback<br/>SnackBar<br/>Toast<br/>Loading Overlay]
+        VALIDATION[Input Validation<br/>Real-time<br/>Focus Loss]
+        PREVENTION[Data Loss Prevention<br/>PopScope/WillPopScope<br/>Dirty Form Alert]
+    end
+
+erDiagram
+    PAGE ||--o{ WIDGET : "contains"
+    WIDGET ||--|| CONTROLLER : "listens to"
+    CONTROLLER ||--|| USE_CASE : "calls"
+    CONTROLLER ||--|| STATE : "manages"
+    STATE ||--o{ LOADING_STATE : "can be"
+    STATE ||--o{ ERROR_STATE : "can be"
+    STATE ||--o{ SUCCESS_STATE : "can be"
+    FORM_WIDGET ||--|| FORM_CONTROLLER : "uses"
+    FORM_CONTROLLER ||--|| VALIDATOR : "validates with"
+    
+    PAGE {
+        String route
+        Map arguments
+        Widget build
+    }
+    
+    WIDGET {
+        Widget build
+        Key key
+        bool const
+    }
+    
+    CONTROLLER {
+        StateNotifier state
+        Future load
+        Future create
+        Future update
+        Future delete
+    }
+    
+    STATE {
+        bool isLoading
+        Object error
+        T data
+        bool isDirty
+    }
+    
+    FORM_WIDGET {
+        GlobalKey formKey
+        Map initialValues
+        List validators
+    }
+
+classDiagram
+    class PresentationLayer {
+        <<layer>>
+        +Pages: Route handlers
+        +Widgets: UI components
+        +Controllers: State management
+        +State: Immutable state classes
+    }
+    
+    class PageWidget {
+        +route: String
+        +build: Widget
+        +navigateTo: void
+    }
+    
+    class FeatureWidget {
+        +build: Widget
+        +_buildHeader: Widget
+        +_buildContent: Widget
+        +_buildFooter: Widget
+    }
+    
+    class StateController {
+        +state: StateNotifier
+        +loadData: Future
+        +handleError: void
+    }
+    
+    class AppState {
+        +isLoading: bool
+        +error: Failure
+        +data: T
+    }
+    
+    PresentationLayer --> PageWidget
+    PresentationLayer --> FeatureWidget
+    PresentationLayer --> StateController
+    PresentationLayer --> AppState
+
+sequenceDiagram
+    participant User
+    participant Page as Page Widget
+    participant Widget as Feature Widget
+    participant Controller as State Controller
+    participant UseCase as Use Case
+    participant Repo as Repository
+    
+    User->>Page: Opens page
+    Page->>Widget: Renders
+    Widget->>Controller: watch(state)
+    Controller->>UseCase: execute()
+    UseCase->>Repo: getAll()
+    Repo-->>UseCase: Either<Failure, Success>
+    UseCase-->>Controller: Either<Failure, Success>
+    alt Success
+        Controller->>Controller: state = SuccessState(data)
+        Controller-->>Widget: State updated
+        Widget-->>User: Displays data
+    else Error
+        Controller->>Controller: state = ErrorState(error)
+        Controller-->>Widget: State updated
+        Widget-->>User: Shows error SnackBar
+    end
+    
+    User->>Widget: Submits form
+    Widget->>Controller: create(entity)
+    Controller->>Controller: state = LoadingState()
+    Controller->>UseCase: execute(entity)
+    UseCase->>Repo: create(entity)
+    Repo-->>UseCase: Either<Failure, Success>
+    UseCase-->>Controller: Either<Failure, Success>
+    Controller->>Controller: state = SuccessState(data)
+    Controller-->>Widget: State updated
+    Widget-->>User: Shows success SnackBar
+

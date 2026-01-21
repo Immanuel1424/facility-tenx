@@ -1,0 +1,83 @@
+# Build outputs
+build
+.web
+*.iml
+.dart_tool
+.packages
+.pub-cache
+.pub
+
+# Dependencies
+.pub-cache
+.packages
+.dart_tool
+# Note: pubspec.lock is REQUIRED for reproducible builds - do NOT exclude it
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings
+
+# OS
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Documentation (exclude all markdown except README)
+*.md
+!README.md
+
+# Test files
+test
+*.test.dart
+coverage
+.analysis_options.yaml
+
+# Environment files
+.env
+.env.local
+.env.*.local
+.env.production
+.env.development
+
+# Logs
+*.log
+
+# Misc
+.cache
+.temp
+tmp
+*.tmp
+
+# Platform-specific (not needed for web build)
+android
+ios
+macos
+windows
+linux
+
+# Docker files (don't copy into image)
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Firebase
+firebase.json
+.firebaserc
+.firebase
+
+# Other
+*.iml
+.fvm
+

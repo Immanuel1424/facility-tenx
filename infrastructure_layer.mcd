@@ -1,0 +1,145 @@
+---
+title: Infrastructure Layer Architecture
+---
+
+flowchart TB
+    subgraph "Infrastructure Layer - External Dependencies"
+        direction TB
+        
+        subgraph "Data Sources"
+            REMOTE[Remote Data Source<br/>API Client<br/>Dio with Interceptors]
+            LOCAL[Local Data Source<br/>Database Operations<br/>Drift/Isar/Hive]
+        end
+        
+        subgraph "Network Layer"
+            DIO[Dio Client<br/>Base URL<br/>Headers]
+            INTERCEPTOR[Auth Interceptor<br/>Token Refresh<br/>Retry Logic]
+            ERROR_HANDLER[Error Handler<br/>Network Exceptions<br/>Status Code Mapping]
+        end
+        
+        subgraph "Database Layer"
+            DB[App Database<br/>Schema Definition]
+            DAO[Data Access Objects<br/>CRUD Operations]
+            MIGRATION[Migration Handler<br/>Version Management]
+        end
+        
+        subgraph "Sync Service"
+            SYNC[Background Sync Service<br/>workmanager/flutter_background_service]
+            QUEUE[Sync Queue<br/>Pending Operations]
+            CONFLICT[Conflict Resolver<br/>Last Write Wins<br/>User Prompt]
+        end
+        
+        subgraph "Storage"
+            SECURE[Secure Storage<br/>flutter_secure_storage<br/>JWT Tokens]
+            CACHE[Cache Manager<br/>Offline Data]
+        end
+        
+        DIO --> INTERCEPTOR
+        INTERCEPTOR --> ERROR_HANDLER
+        ERROR_HANDLER --> REMOTE
+        
+        DB --> DAO
+        DAO --> MIGRATION
+        MIGRATION --> LOCAL
+        
+        SYNC --> QUEUE
+        QUEUE --> CONFLICT
+        CONFLICT --> REMOTE
+        CONFLICT --> LOCAL
+        
+        SECURE --> INTERCEPTOR
+        CACHE --> LOCAL
+    end
+    
+    subgraph "Repository Implementation"
+        REPO_IMPL[Repository Implementation<br/>Implements Domain Interface]
+        REPO_IMPL --> REMOTE
+        REPO_IMPL --> LOCAL
+        REPO_IMPL --> SYNC
+    end
+
+erDiagram
+    REPOSITORY_IMPL ||--|| REMOTE_DATA_SOURCE : "uses"
+    REPOSITORY_IMPL ||--|| LOCAL_DATA_SOURCE : "uses"
+    REPOSITORY_IMPL ||--|| SYNC_SERVICE : "triggers"
+    REMOTE_DATA_SOURCE ||--|| API_CLIENT : "uses"
+    LOCAL_DATA_SOURCE ||--|| DATABASE : "uses"
+    DATABASE ||--|| DAO : "contains"
+    SYNC_SERVICE ||--|| SYNC_QUEUE : "manages"
+    SYNC_SERVICE ||--|| CONFLICT_RESOLVER : "uses"
+    API_CLIENT ||--|| AUTH_INTERCEPTOR : "has"
+    API_CLIENT ||--|| ERROR_HANDLER : "has"
+    
+    REPOSITORY_IMPL {
+        Future_Either getAll
+        Future_Either getById
+        Future_Either create
+        Future_Either update
+        Future_Either delete
+        Stream_List watchAll
+    }
+    
+    REMOTE_DATA_SOURCE {
+        Future_List fetchAll
+        Future_T fetchById
+        Future_T create
+        Future_T update
+        Future_void delete
+    }
+    
+    LOCAL_DATA_SOURCE {
+        Future_List getAll
+        Future_T getById
+        Future_int insert
+        Future_int update
+        Future_int delete
+        Stream_List watchAll
+    }
+    
+    DATABASE {
+        string name
+        int version
+        Schema schema
+    }
+    
+    SYNC_SERVICE {
+        Future_void syncPending
+        Future_void syncAll
+        Future_void resolveConflict
+    }
+
+sequenceDiagram
+    participant UI as UI Layer
+    participant Repo as Repository Impl
+    participant Local as Local Data Source
+    participant Remote as Remote Data Source
+    participant Sync as Sync Service
+    
+    Note over UI,Sync: Offline-First Write Path
+    UI->>Repo: create(entity)
+    Repo->>Local: insert(entity)
+    Local-->>Repo: entity (with isSynced=false)
+    Repo-->>UI: Success(entity)
+    Repo->>Sync: queueForSync(entity)
+    
+    Note over UI,Sync: Read Path (Always from Local)
+    UI->>Repo: getAll()
+    Repo->>Local: getAll()
+    Local-->>Repo: List<Entity>
+    Repo-->>UI: Success(List<Entity>)
+    
+    Note over Sync,Remote: Background Sync
+    Sync->>Local: getPendingSyncs()
+    Local-->>Sync: List<Entity>
+    loop For each pending entity
+        Sync->>Remote: create(entity)
+        alt Success
+            Remote-->>Sync: Success
+            Sync->>Local: markAsSynced(entity)
+        else Conflict
+            Remote-->>Sync: Conflict
+            Sync->>Sync: resolveConflict()
+            Sync->>Local: update(entity)
+        end
+    end
+

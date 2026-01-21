@@ -1,0 +1,96 @@
+---
+title: Feature Structure and Naming Conventions
+---
+
+flowchart TB
+    subgraph "Root Structure"
+        LIB[lib/]
+        LIB --> SRC[src/]
+        SRC --> FEATURES[features/]
+        SRC --> CORE[core/]
+        SRC --> SHARED[shared/]
+    end
+    
+    subgraph "Feature Structure (Feature-First)"
+        FEATURES --> F1[feature_name/]
+        F1 --> DATA[data/]
+        F1 --> DOMAIN[domain/]
+        F1 --> PRESENTATION[presentation/]
+        
+        DATA --> DATA_REPO[repositories/<br/>feature_repository_impl.dart]
+        DATA --> DATA_DTO[dto/<br/>feature_dto.dart]
+        DATA --> DATA_SOURCE[data_sources/<br/>feature_remote_data_source.dart<br/>feature_local_data_source.dart]
+        
+        DOMAIN --> DOMAIN_ENTITY[entities/<br/>feature_entity.dart]
+        DOMAIN --> DOMAIN_USECASE[usecases/<br/>get_feature_usecase.dart<br/>create_feature_usecase.dart]
+        DOMAIN --> DOMAIN_REPO[repositories/<br/>feature_repository.dart]
+        
+        PRESENTATION --> PRES_WIDGET[widgets/<br/>feature_list_widget.dart<br/>feature_form_widget.dart]
+        PRESENTATION --> PRES_CONTROLLER[controllers/<br/>feature_controller.dart<br/>feature_notifier.dart]
+        PRESENTATION --> PRES_PAGE[pages/<br/>feature_list_page.dart<br/>feature_detail_page.dart]
+    end
+    
+    subgraph "Core Module"
+        CORE --> CORE_ERROR[error/<br/>failures.dart<br/>exceptions.dart]
+        CORE --> CORE_NETWORK[network/<br/>api_client.dart<br/>dio_interceptor.dart]
+        CORE --> CORE_DB[database/<br/>app_database.dart<br/>database_helper.dart]
+        CORE --> CORE_UTILS[utils/<br/>validators.dart<br/>formatters.dart]
+    end
+    
+    subgraph "Shared Module"
+        SHARED --> SHARED_WIDGET[widgets/<br/>loading_overlay.dart<br/>error_snackbar.dart]
+        SHARED --> SHARED_THEME[theme/<br/>app_theme.dart<br/>text_styles.dart]
+        SHARED --> SHARED_CONSTANTS[constants/<br/>app_constants.dart]
+    end
+
+classDiagram
+    class NamingConventions {
+        <<convention>>
+        +FileNames: snake_case
+        +ClassNames: PascalCase
+        +VariableNames: camelCase
+        +PrivateMembers: _leadingUnderscore
+        +Constants: UPPER_SNAKE_CASE
+    }
+    
+    class FileNaming {
+        <<example>>
+        +feature_repository_impl.dart
+        +facility_entity.dart
+        +create_facility_usecase.dart
+        +facility_list_widget.dart
+        +facility_controller.dart
+    }
+    
+    class DirectoryNaming {
+        <<example>>
+        +lib/src/features/facility_management/
+        +lib/src/features/inventory/
+        +lib/src/features/maintenance/
+        +lib/src/core/
+        +lib/src/shared/
+    }
+    
+    NamingConventions --> FileNaming
+    NamingConventions --> DirectoryNaming
+
+graph LR
+    subgraph "Feature Example: Facility Management"
+        FM[facility_management/]
+        FM --> FM_DATA[data/]
+        FM --> FM_DOMAIN[domain/]
+        FM --> FM_PRES[presentation/]
+        
+        FM_DATA --> FM_REPO[repositories/<br/>facility_repository_impl.dart]
+        FM_DATA --> FM_DTO[dto/<br/>facility_dto.dart]
+        FM_DATA --> FM_DS[data_sources/<br/>facility_remote_data_source.dart<br/>facility_local_data_source.dart]
+        
+        FM_DOMAIN --> FM_ENT[entities/<br/>facility_entity.dart]
+        FM_DOMAIN --> FM_UC[usecases/<br/>get_facilities_usecase.dart<br/>create_facility_usecase.dart<br/>update_facility_usecase.dart]
+        FM_DOMAIN --> FM_RI[repositories/<br/>facility_repository.dart]
+        
+        FM_PRES --> FM_WID[widgets/<br/>facility_list_widget.dart<br/>facility_card_widget.dart<br/>facility_form_widget.dart]
+        FM_PRES --> FM_CTRL[controllers/<br/>facility_controller.dart<br/>facility_notifier.dart]
+        FM_PRES --> FM_PG[pages/<br/>facility_list_page.dart<br/>facility_detail_page.dart<br/>facility_form_page.dart]
+    end
+

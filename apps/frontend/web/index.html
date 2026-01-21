@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <!--
+    If you are serving your web app in a path other than the root, change the
+    href value below to reflect the base path you are serving from.
+
+    The path provided below has to start and end with a slash "/" in order for
+    it to work correctly.
+
+    For more details:
+    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
+
+    This is a placeholder for base href that will be replaced by the value of
+    the `--base-href` argument provided to `flutter build`.
+  -->
+  <base href="$FLUTTER_BASE_HREF">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="TENX - Tenant Experience Layer for Residential Communities">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+  
+  <!-- Performance: Resource Hints for faster loading -->
+  <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+  <link rel="dns-prefetch" href="https://www.gstatic.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+
+  <!-- iOS meta tags & icons -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="TENX">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
+  <link rel="icon" type="image/png" href="favicon.png"/>
+
+  <title>TENX</title>
+  <link rel="manifest" href="manifest.json">
+
+  <!-- Firebase SDK for Web Push Notifications - Loaded asynchronously after initial render -->
+  <!-- Deferred to improve initial page load performance -->
+  <script>
+    // Defer Firebase initialization until after first paint
+    // This improves Time to Interactive (TTI) and First Contentful Paint (FCP)
+    window.addEventListener('load', function() {
+      // Load Firebase scripts asynchronously
+      const firebaseAppScript = document.createElement('script');
+      firebaseAppScript.src = 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js';
+      firebaseAppScript.async = true;
+      firebaseAppScript.defer = true;
+      
+      const firebaseMessagingScript = document.createElement('script');
+      firebaseMessagingScript.src = 'https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js';
+      firebaseMessagingScript.async = true;
+      firebaseMessagingScript.defer = true;
+      
+      firebaseAppScript.onload = function() {
+        document.head.appendChild(firebaseMessagingScript);
+        
+        firebaseMessagingScript.onload = function() {
+          // Firebase configuration
+          const firebaseConfig = {
+            apiKey: "AIzaSyDOxrZ9lzyMYQycwVgYCl8SyWjlLjyRZBU",
+            authDomain: "tenx-bf726.firebaseapp.com",
+            projectId: "tenx-bf726",
+            storageBucket: "tenx-bf726.firebasestorage.app",
+            messagingSenderId: "859031041738",
+            appId: "1:859031041738:web:1ff14fe363f9c41534a633",
+            measurementId: "G-CE38K8FFQS"
+          };
+          
+          // Initialize Firebase
+          if (typeof firebase !== 'undefined') {
+            firebase.initializeApp(firebaseConfig);
+            console.log('✅ Firebase initialized for web push notifications (deferred)');
+            
+            // Register Firebase Messaging service worker
+            // Gracefully handle errors - service worker is optional for app functionality
+            if ('serviceWorker' in navigator) {
+              navigator.serviceWorker.register('/firebase-messaging-sw.js')
+                .then((registration) => {
+                  console.log('✅ Service Worker registered successfully:', registration.scope);
+                })
+                .catch((error) => {
+                  // Service worker registration failure is non-critical
+                  // App will continue to work, but push notifications may not work
+                  console.warn('⚠️ Service Worker registration failed (non-critical):', error);
+                  console.warn('⚠️ Push notifications may not work, but app will continue to function normally.');
+                  if (error.message && error.message.includes('404')) {
+                    console.warn('⚠️ firebase-messaging-sw.js not found. Ensure it exists at web root in Docker image.');
+                  }
+                });
+            } else {
+              console.warn('⚠️ Service Workers are not supported in this browser');
+            }
+          }
+        };
+      };
+      
+      document.head.appendChild(firebaseAppScript);
+    });
+  </script>
+  
+  <!-- Runtime Configuration (injected by docker-entrypoint.sh in production) -->
+  <!-- NOTE: In production, config.js MUST be present and contain the correct API_BASE_URL -->
+  <!-- The localhost fallback below is ONLY for local development and will NOT work in production -->
+  <script>
+    // Initialize config object with development fallback (LOCAL DEVELOPMENT ONLY)
+    // In production, this will be overridden by config.js generated by docker-entrypoint.sh
+    // If you see this fallback in production, it means config.js failed to load - check container logs
+    if (typeof window.__APP_CONFIG__ === 'undefined') {
+      window.__APP_CONFIG__ = {
+        API_BASE_URL: 'http://localhost:3000/api/v1' // DEVELOPMENT ONLY - will not work in production
+      };
+      if (window.console && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+        console.error('❌ ERROR: config.js not loaded in production! API calls will fail.');
+        console.error('   This should never happen - check docker-entrypoint.sh and container logs.');
+      }
+    }
+  </script>
+  <!-- Load runtime config from config.js (generated at container startup) -->
+  <!-- Load synchronously to ensure it executes BEFORE Flutter initializes -->
+  <!-- Use blocking script to ensure config is available before Flutter starts -->
+  <script src="config.js"></script>
+  <script>
+    // Validate config after loading
+    (function() {
+      if (typeof window.__APP_CONFIG__ === 'undefined') {
+        if (window.console) {
+          console.error('❌ ERROR: config.js failed to load or __APP_CONFIG__ is undefined');
+          console.error('   Check that docker-entrypoint.sh generated config.js correctly');
+        }
+        // Only use localhost fallback in development
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+          window.__APP_CONFIG__ = {
+            API_BASE_URL: 'http://localhost:3000/api/v1'
+          };
+          console.warn('⚠️ Using development fallback (localhost)');
+        } else {
+          // In production, fail fast with clear error
+          console.error('❌ PRODUCTION ERROR: Cannot use localhost fallback');
+          console.error('   Set API_BASE_URL environment variable in docker-compose.yml');
+          // Still set it to prevent app crash, but log error
+          window.__APP_CONFIG__ = {
+            API_BASE_URL: 'http://localhost:3000/api/v1' // Will fail in production
+          };
+        }
+      } else if (window.console && window.__APP_CONFIG__) {
+        console.log('✅ config.js loaded successfully:', window.__APP_CONFIG__);
+        // Warn if localhost is detected in production
+        if (window.__APP_CONFIG__.API_BASE_URL && 
+            (window.__APP_CONFIG__.API_BASE_URL.includes('localhost') || 
+             window.__APP_CONFIG__.API_BASE_URL.includes('127.0.0.1')) &&
+            window.location.hostname !== 'localhost' && 
+            window.location.hostname !== '127.0.0.1') {
+          console.error('❌ ERROR: API_BASE_URL contains localhost in production!');
+          console.error('   Current value:', window.__APP_CONFIG__.API_BASE_URL);
+          console.error('   This will NOT work - set API_BASE_URL to your actual backend URL');
+        }
+      }
+    })();
+  </script>
+</head>
+<body>
+  <!-- Flutter bootstrap script - async for non-blocking load -->
+  <!-- Preload critical Flutter resources for faster initial load -->
+  <link rel="preload" href="flutter_bootstrap.js" as="script">
+  <script src="flutter_bootstrap.js" async></script>
+</body>
+</html>

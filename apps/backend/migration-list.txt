@@ -1,0 +1,83 @@
+
+> facility-erp-backend@0.0.1 migrate:status
+> ts-node -r tsconfig-paths/register scripts/run-pending-migrations.ts --status
+
+🔍 Scanning for migration files...
+✅ Database connected
+
+📦 Creating migration tracker table...
+✅ Migration tracker table created
+
+
+📊 Migration Status Report
+========================================
+📋 Total migration files: 63
+✅ Executed migrations: 0
+⏳ Pending migrations: 63
+========================================
+
+⏳ Pending migrations:
+   1. 000-create-migration-tracker.sql
+   2. 001-schema-consolidation.sql
+   3. 002-drop-service-requests.sql
+   4. 003-seed-permissions.sql
+   5. 004-schema-standards-compliance.sql
+   6. 005-create-priorities-table.sql
+   7. 006-add-missing-fk-indexes.sql
+   8. 007-update-admin-email.sql
+   9. 008-update-admin-password.sql
+   10. 009-remove-tenant-role-from-admin.sql
+   11. 010-create-users.sql
+   12. 011-create-company.sql
+   13. 012-create-admin-user.sql
+   14. 013-create-villa-types-and-roles.sql
+   15. 014-create-ticket-categories.sql
+   16. 015-create-system-company-and-super-admin.sql
+   17. 016-create-user-sites-table.sql
+   18. 017-partial-unique-email-index.sql
+   19. add-bathroom-floor-to-villas.sql
+   20. add-building-unit-fields-to-villas.sql
+   21. add-city-pin-code-to-villas.sql
+   22. add-contact-fields-to-maintenance-tickets.sql
+   23. add-deleted-at-to-users.sql
+   24. add-department-id-to-users.sql
+   25. add-location-detail-to-maintenance-tickets.sql
+   26. add-makani-po-box-to-villas.sql
+   27. add-measure-column-to-villas.sql
+   28. add-measure-external-area-to-villas.sql
+   29. add-missing-columns-to-users.sql
+   30. add-missing-villa-columns.sql
+   31. add-phone-numbers-to-users.sql
+   32. add-rating-to-maintenance-tickets.sql
+   33. add-start-work-time-to-sla-configurations.sql
+   34. add-updated-at-to-announcement-reads.sql
+   35. add-user-villas-table.sql
+   36. add-villa-additional-fields.sql
+   37. add-villa-metadata-columns.sql
+   38. add-villa-numbers-to-users.sql
+   39. assign-announcement-read-to-technician.sql
+   40. change-ticket-villa-number-to-varchar.sql
+   41. change-user-villa-number-to-varchar.sql
+   42. change-villa-number-to-varchar.sql
+   43. check-user-roles.sql
+   44. complete-project-location-master-migration.sql
+   45. create-announcements-tables.sql
+   46. create-cities-locations-tables.sql
+   47. create-escalation-history-table.sql
+   48. create-password-reset-tokens-table.sql
+   49. create-project-location-view.sql
+   50. create-system-config-table.sql
+   51. create-user-devices-table.sql
+   52. create-villa-type-configs-table.sql
+   53. delete-tickets-with-null-category.sql
+   54. query-all-locations-with-country.sql
+   55. RUN_ANNOUNCEMENT_PERMISSIONS_IN_PRODUCTION.sql
+   56. RUN_THIS_IN_PRODUCTION.sql
+   57. seed-project-location-master-data.sql
+   58. seed-project-locations-with-areas.sql
+   59. seed-uae-cities-locations.sql
+   60. update-cities-table-for-project-location-master.sql
+   61. update-user-email-vivek.sql
+   62. verify-oman-cities.sql
+   63. verify-villa-columns.sql
+

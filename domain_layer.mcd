@@ -1,0 +1,79 @@
+---
+title: Domain Layer Architecture
+---
+
+erDiagram
+    ENTITY ||--o{ USE_CASE : "used by"
+    USE_CASE ||--|| REPOSITORY_INTERFACE : "depends on"
+    REPOSITORY_INTERFACE ||--o{ ENTITY : "returns"
+    FAILURE ||--o{ USE_CASE : "returns on error"
+    SUCCESS ||--o{ USE_CASE : "returns on success"
+    
+    ENTITY {
+        int id
+        DateTime createdAt
+        DateTime updatedAt
+        bool isSynced
+        string syncStatus
+    }
+    
+    USE_CASE {
+        Future_Either execute
+        validateInput
+        handleError
+    }
+    
+    REPOSITORY_INTERFACE {
+        Future_Either getAll
+        Future_Either getById
+        Future_Either create
+        Future_Either update
+        Future_Either delete
+        Stream_List watchAll
+    }
+    
+    FAILURE {
+        string message
+        int code
+        Exception exception
+    }
+    
+    SUCCESS {
+        T data
+        string message
+    }
+
+flowchart TB
+    subgraph "Domain Layer - Business Logic"
+        direction TB
+        E[Entities<br/>Pure Dart Classes<br/>freezed/equatable]
+        UC[Use Cases<br/>Business Rules<br/>Validation Logic]
+        RI[Repository Interfaces<br/>Contracts<br/>No Implementation]
+        
+        E --> UC
+        UC --> RI
+        
+        style E fill:#e1f5ff
+        style UC fill:#fff4e1
+        style RI fill:#ffe1f5
+    end
+    
+    subgraph "Error Handling"
+        direction LR
+        F[Failure<br/>NetworkError<br/>ValidationError<br/>DatabaseError]
+        S[Success<br/>T data]
+        
+        UC -->|"Either<Failure, Success>"| F
+        UC -->|"Either<Failure, Success>"| S
+    end
+    
+    subgraph "Example: Facility Management"
+        direction TB
+        FE[FacilityEntity<br/>id, name, address, status]
+        FCU[CreateFacilityUseCase<br/>validateName<br/>validateAddress]
+        FRI[IFacilityRepository<br/>createFacility<br/>getFacilityById]
+        
+        FE --> FCU
+        FCU --> FRI
+    end
+

@@ -1,0 +1,41 @@
+---
+alwaysApply: true
+---
+
+lib/
+│
+├── main.dart
+│
+├── core/
+│ ├── theme/
+│ │ ├── app_theme.dart
+│ │ └── app_colors.dart
+│ │
+│ ├── constants/
+│ │ └── app_strings.dart
+│ │
+│ ├── widgets/
+│ │ ├── app_button.dart
+│ │ ├── app_text_field.dart
+│ │ └── app_card.dart
+│ │
+│ └── utils/
+│ └── validators.dart
+│
+├── features/
+│ └── auth/
+│ ├── presentation/
+│ │ ├── login_screen.dart
+│ │ ├── forgot_password_screen.dart
+│ │ └── widgets/
+│ │ └── offline_banner.dart
+│ │
+│ ├── bloc/
+│ │ ├── auth_bloc.dart
+│ │ ├── auth_event.dart
+│ │ └── auth_state.dart
+│ │
+│ └── data/
+│ └── auth_repository.dart
+│
+└── app.dart

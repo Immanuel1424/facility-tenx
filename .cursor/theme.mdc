@@ -1,0 +1,111 @@
+---
+alwaysApply: true
+---
+
+You are a senior Flutter engineer.
+
+Create a production-ready Flutter project with a centralized design system.
+Follow Material 3. Do not use inline styles. Everything must come from theme files.
+
+PROJECT RULES
+
+- Flutter stable
+- Material 3
+- Clean architecture
+- One global theme
+- No Colors.blue or inline Color/TextStyle
+- Mobile + Web compatible
+
+FOLDER STRUCTURE
+lib/
+core/
+theme/
+app_colors.dart
+app_typography.dart
+app_theme.dart
+main.dart
+app.dart
+
+FONTS
+
+- Use Inter font
+- Configure in pubspec.yaml
+- Use Inter for all text
+
+CREATE app_colors.dart WITH THESE TOKENS
+
+Background: #F8FAFC
+Foreground: #111827
+Border: #E5E7EB
+Input: #FFFFFF
+
+Primary: #2563EB
+Primary Foreground: #FFFFFF
+
+Secondary: #F1F5F9
+Secondary Foreground: #0F172A
+
+Muted: #F1F5F9
+Muted Foreground: #6B7280
+
+Accent: #DBEAFE
+Accent Foreground: #1E3A8A
+
+Success: #16A34A
+Success Foreground: #FFFFFF
+
+Warning: #F59E0B
+Warning Foreground: #78350F
+
+Destructive: #DC2626
+Destructive Foreground: #FFFFFF
+
+Card: #FFFFFF
+Card Foreground: #111827
+
+Sidebar: #020617
+Sidebar Foreground: #E5E7EB
+Sidebar Primary: #2563EB
+Sidebar Primary FG: #FFFFFF
+
+CREATE app_typography.dart
+
+- Font family: Inter
+- headline: 22px, semi-bold
+- title: 16px, medium
+- body: 14px, regular
+- label: 13px, medium
+- button: 14px, semi-bold
+- All colors must come from AppColors
+
+CREATE app_theme.dart
+
+- Enable Material 3
+- Map all colors to ColorScheme
+- Scaffold background = Background
+- Card theme with border radius 12 and border color
+- InputDecorationTheme:
+  - Filled
+  - Border radius 10
+  - Default border = Border
+  - Focus border = Primary
+  - Error border = Destructive
+- ElevatedButtonTheme:
+  - Height 48
+  - Full width
+  - Background = Primary
+  - Text style = button typography
+- Use Inter font globally
+
+main.dart
+
+- Initialize app
+- Use AppTheme.lightTheme
+- Disable debug banner
+
+IMPORTANT
+
+- Do not add demo UI
+- Do not add extra colors
+- Do not add inline styling
+- Everything must be reusable and scalable

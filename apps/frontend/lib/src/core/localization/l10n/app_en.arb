@@ -1,0 +1,68 @@
+{
+  "@@locale": "en",
+  "appName": "TENX",
+  "@appName": {
+    "description": "The application name"
+  },
+  "login": "Login",
+  "@login": {
+    "description": "Login button text"
+  },
+  "email": "Email",
+  "@email": {
+    "description": "Email label"
+  },
+  "password": "Password",
+  "@password": {
+    "description": "Password label"
+  },
+  "dashboard": "Dashboard",
+  "@dashboard": {
+    "description": "Dashboard title"
+  },
+  "serviceRequests": "Service Requests",
+  "@serviceRequests": {
+    "description": "Service requests title"
+  },
+  "createServiceRequest": "Create Service Request",
+  "@createServiceRequest": {
+    "description": "Create service request button"
+  },
+  "title": "Title",
+  "@title": {
+    "description": "Title label"
+  },
+  "description": "Description",
+  "@description": {
+    "description": "Description label"
+  },
+  "status": "Status",
+  "@status": {
+    "description": "Status label"
+  },
+  "priority": "Priority",
+  "@priority": {
+    "description": "Priority label"
+  },
+  "save": "Save",
+  "@save": {
+    "description": "Save button"
+  },
+  "cancel": "Cancel",
+  "@cancel": {
+    "description": "Cancel button"
+  },
+  "delete": "Delete",
+  "@delete": {
+    "description": "Delete button"
+  },
+  "edit": "Edit",
+  "@edit": {
+    "description": "Edit button"
+  },
+  "logout": "Logout",
+  "@logout": {
+    "description": "Logout button"
+  }
+}
+
