@@ -25,7 +25,7 @@ stages:
         set -e
 
         PROJECT="$(echo "$(Build.Repository.Name)" | awk -F'/' '{print $2}')"
-        BRANCH_NAME="$(Build.SourceBranchName)"
+        BRANCH="$(echo "$(Build.SourceBranch)" | cut -d '/' -f 3- )" 
         IMAGE_VERSION=""
         STOP_PIPELINE=false
         SKIP_CD=false
