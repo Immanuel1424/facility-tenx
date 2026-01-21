@@ -101,7 +101,6 @@ stages:
       IMAGE_VERSION: $[ dependencies.Branch_Check.outputs['CheckBranch.IMAGE_VERSION'] ]
       BRANCH_NAME: $[ dependencies.Branch_Check.outputs['CheckBranch.BRANCH_NAME'] ]
       GIT_COMMIT: $(Build.SourceVersion)
-      BUILD_TIME: $[format('{0:yyyy-MM-ddTHH:mm:ssZ}', pipeline.startTime)]
       PROJECT_NAME: $(Build.Repository.Name)
     steps:
     - bash: |
