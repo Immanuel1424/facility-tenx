@@ -5,7 +5,7 @@ trigger:
       - release/*
 
 variables:
-  - group: facility-erp-ci
+  - group: facility-erp-ci-vars
   - name: PLATFORM
     value: linux/amd64
 
@@ -103,13 +103,11 @@ stages:
     displayName: 'Docker Build & Push'
     dependsOn: Branch_Check
     pool: 'hsn-shost-agent'
-
     condition: and(
       succeeded(),
       eq(dependencies.Branch_Check.outputs['CheckBranch.STOP_PIPELINE'], 'false'),
       eq(dependencies.Branch_Check.outputs['CheckBranch.SKIP_CD'], 'false')
     )
-
     variables:
       IMAGE_VERSION: $[ dependencies.Branch_Check.outputs['CheckBranch.IMAGE_VERSION'] ]
       BRANCH_NAME: $[ dependencies.Branch_Check.outputs['CheckBranch.BRANCH_NAME'] ]
