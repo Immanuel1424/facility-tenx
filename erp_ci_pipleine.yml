@@ -1,152 +1,143 @@
 trigger:
   branches:
     include:
-      - develop
-      - release/*
+    - develop
+    - release/*
 
 variables:
-  - group: facility-erp-ci-vars
-  - name: PLATFORM
-    value: linux/amd64
+- group: facility-erp-ci-vars
+- name: PLATFORM
+  value: linux/amd64
 
 stages:
-  - stage: CI
-    displayName: CI – Branch Check, Versioning, Build & Push
-    jobs:
-      # ------------------------------------------------
-      # Job 1: Branch & Version Resolution
-      # ------------------------------------------------
-      - job: Branch_Check
-        displayName: 'Resolve Image Version'
-        pool: 'hsn-shost-agent'
-        steps:
-          - bash: |
-              set -e
+- stage: CI
+  displayName: CI – Branch Check, Versioning, Build & Push
+  jobs:
+  - job: Branch_Check
+    displayName: 'Resolve Image Version'
+    pool: 'hsn-shost-agent'
+    steps:
+    - bash: |
+        set -e
 
-              BRANCH_NAME="$(Build.SourceBranchName)"
-              IMAGE_VERSION=""
-              STOP_PIPELINE=false
-              SKIP_CD=false
+        BRANCH_NAME="$(Build.SourceBranchName)"
+        IMAGE_VERSION=""
+        STOP_PIPELINE=false
+        SKIP_CD=false
 
-              echo "Branch detected: $BRANCH_NAME"
+        echo "Branch detected: $BRANCH_NAME"
 
-              # -------------------------------
-              # Get latest image version from Docker Hub
-              # -------------------------------
-              get_next_version() {
-                echo "Fetching latest Docker image version..."
+        # -------------------------------
+        # Get latest image version from Docker Hub
+        # -------------------------------
+        get_next_version() {
+          echo "Fetching latest Docker image version..."
 
-                TAGS=$(curl -s -u "$DOCKER_USERNAME:$DOCKER_PAT" \
-                  "https://hub.docker.com/v2/repositories/$DOCKER_USERNAME/$DOCKER_REPO_BACKEND/tags?page_size=100" \
-                  | jq -r '.results[].name' \
-                  | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' \
-                  | sort -V)
+          TAGS=$(curl -s -u "$DOCKER_USERNAME:$DOCKER_PAT" \
+            "https://hub.docker.com/v2/repositories/$DOCKER_USERNAME/$DOCKER_REPO_BACKEND/tags?page_size=100" \
+            | jq -r '.results[].name' \
+            | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' \
+            | sort -V)
 
-                if [[ -z "$TAGS" ]]; then
-                  echo "No existing tags found, starting from 1.0.0"
-                  echo "1.0.0"
-                  return
-                fi
+          if [[ -z "$TAGS" ]]; then
+            echo "No existing tags found, starting from 1.0.0"
+            echo "1.0.0"
+            return
+          fi
 
-                LATEST=$(echo "$TAGS" | tail -n 1)
-                IFS='.' read -r MAJOR MINOR PATCH <<< "$LATEST"
-                PATCH=$((PATCH + 1))
+          LATEST=$(echo "$TAGS" | tail -n 1)
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$LATEST"
+          PATCH=$((PATCH + 1))
 
-                echo "$MAJOR.$MINOR.$PATCH"
-              }
+          echo "$MAJOR.$MINOR.$PATCH"
+        }
 
-              # -------------------------------
-              # Develop branch → constant version
-              # -------------------------------
-              if [[ "$BRANCH_NAME" == "develop" ]]; then
-                  IMAGE_VERSION="$DEVELOP_IMAGE_VERSION"
-                  echo "Develop branch → fixed version $IMAGE_VERSION"
+        # -------------------------------
+        # Develop branch → constant version
+        # -------------------------------
+        if [[ "$BRANCH_NAME" == "develop" ]]; then
+            IMAGE_VERSION="$DEVELOP_IMAGE_VERSION"
+            echo "Develop branch → fixed version $IMAGE_VERSION"
 
-              # -------------------------------
-              # Release branch → auto-increment
-              # -------------------------------
-              elif [[ "$BRANCH_NAME" == release/* ]]; then
-                  IMAGE_VERSION="$(get_next_version)"
-                  echo "Release branch → auto-incremented version $IMAGE_VERSION"
+        # -------------------------------
+        # Release branch → auto-increment
+        # -------------------------------
+        elif [[ "$BRANCH_NAME" == release/* ]]; then
+            IMAGE_VERSION="$(get_next_version)"
+            echo "Release branch → auto-incremented version $IMAGE_VERSION"
 
-              else
-                  echo "❌ Invalid branch"
-                  STOP_PIPELINE=true
-                  SKIP_CD=true
-                  exit 1
-              fi
+        else
+            echo "❌ Invalid branch"
+            STOP_PIPELINE=true
+            SKIP_CD=true
+            exit 1
+        fi
 
-              echo "Final image version: $IMAGE_VERSION"
+        echo "Final image version: $IMAGE_VERSION"
 
-              echo "##vso[task.setvariable variable=IMAGE_VERSION;isOutput=true]$IMAGE_VERSION"
-              echo "##vso[task.setvariable variable=BRANCH_NAME;isOutput=true]$BRANCH_NAME"
-              echo "##vso[task.setvariable variable=STOP_PIPELINE;isOutput=true]$STOP_PIPELINE"
-              echo "##vso[task.setvariable variable=SKIP_CD;isOutput=true]$SKIP_CD"
+        echo "##vso[task.setvariable variable=IMAGE_VERSION;isOutput=true]$IMAGE_VERSION"
+        echo "##vso[task.setvariable variable=BRANCH_NAME;isOutput=true]$BRANCH_NAME"
+        echo "##vso[task.setvariable variable=STOP_PIPELINE;isOutput=true]$STOP_PIPELINE"
+        echo "##vso[task.setvariable variable=SKIP_CD;isOutput=true]$SKIP_CD"
+      name: CheckBranch
+      displayName: 'Branch & Version Resolver'
+      env:
+        DOCKER_USERNAME: $(docker_username)
+        DOCKER_PAT: $(docker_pat)
+        DOCKER_REPO_BACKEND: $(docker_repo_backend)
+        DEVELOP_IMAGE_VERSION: $(develop_image_version)
 
-            name: CheckBranch
-            displayName: 'Branch & Version Resolver'
-            env:
-              DOCKER_USERNAME: $(docker_username)
-              DOCKER_PAT: $(docker_pat)
-              DOCKER_REPO_BACKEND: $(docker_repo_backend)
-              DEVELOP_IMAGE_VERSION: $(develop_image_version)
+  - job: Docker_Build_Push
+    displayName: 'Docker Build & Push'
+    dependsOn: Branch_Check
+    pool: 'hsn-shost-agent'
+    condition: and(
+      succeeded(),
+      eq(dependencies.Branch_Check.outputs['CheckBranch.STOP_PIPELINE'], 'false'),
+      eq(dependencies.Branch_Check.outputs['CheckBranch.SKIP_CD'], 'false'))
+    variables:
+      IMAGE_VERSION: $[ dependencies.Branch_Check.outputs['CheckBranch.IMAGE_VERSION'] ]
+      BRANCH_NAME: $[ dependencies.Branch_Check.outputs['CheckBranch.BRANCH_NAME'] ]
+      GIT_COMMIT: $(Build.SourceVersion)
+      BUILD_TIME: $[format('{0:yyyy-MM-ddTHH:mm:ssZ}', pipeline.startTime)]
+      PROJECT_NAME: $(Build.Repository.Name)
+    steps:
+    - bash: |
+        set -e
 
-      # ------------------------------------------------
-      # Job 2: Docker Build & Push
-      # ------------------------------------------------
-      - job: Docker_Build_Push
-        displayName: 'Docker Build & Push'
-        dependsOn: Branch_Check
-        pool: 'hsn-shost-agent'
-        condition: and(
-          succeeded(),
-          eq(dependencies.Branch_Check.outputs['CheckBranch.STOP_PIPELINE'], 'false'),
-          eq(dependencies.Branch_Check.outputs['CheckBranch.SKIP_CD'], 'false')
-        )
-        variables:
-          IMAGE_VERSION: $[ dependencies.Branch_Check.outputs['CheckBranch.IMAGE_VERSION'] ]
-          BRANCH_NAME: $[ dependencies.Branch_Check.outputs['CheckBranch.BRANCH_NAME'] ]
-          GIT_COMMIT: $(Build.SourceVersion)
-          BUILD_TIME: $[format('{0:yyyy-MM-ddTHH:mm:ssZ}', pipeline.startTime)]
-          PROJECT_NAME: $(Build.Repository.Name)
-        steps:
-          - bash: |
-              set -e
+        echo "$(DOCKER_PAT)" | docker login -u "$(DOCKER_USERNAME)" --password-stdin
 
-              echo "$(DOCKER_PAT)" | docker login -u "$(DOCKER_USERNAME)" --password-stdin
+        docker buildx create --name facility-erp-builder --use || true
+        docker buildx inspect --bootstrap
 
-              docker buildx create --name facility-erp-builder --use || true
-              docker buildx inspect --bootstrap
+        echo "Building Backend"
+        docker buildx build \
+          --platform $(PLATFORM) \
+          --tag $(DOCKER_USERNAME)/facility-erp-backend:$(IMAGE_VERSION) \
+          --label org.opencontainers.image.version="$(IMAGE_VERSION)" \
+          --label org.opencontainers.image.ref.name="$(BRANCH_NAME)" \
+          --label org.opencontainers.image.revision="$(GIT_COMMIT)" \
+          --label org.opencontainers.image.created="$(BUILD_TIME)" \
+          --load \
+          -f apps/backend/Dockerfile \
+          apps/backend
 
-              echo "Building Backend"
-              docker buildx build \
-                --platform $(PLATFORM) \
-                --tag $(DOCKER_USERNAME)/facility-erp-backend:$(IMAGE_VERSION) \
-                --label org.opencontainers.image.version="$(IMAGE_VERSION)" \
-                --label org.opencontainers.image.ref.name="$(BRANCH_NAME)" \
-                --label org.opencontainers.image.revision="$(GIT_COMMIT)" \
-                --label org.opencontainers.image.created="$(BUILD_TIME)" \
-                --load \
-                -f apps/backend/Dockerfile \
-                apps/backend
+        echo "Building Frontend"
+        docker buildx build \
+          --platform $(PLATFORM) \
+          --tag $(DOCKER_USERNAME)/facility-erp-frontend:$(IMAGE_VERSION) \
+          --label org.opencontainers.image.version="$(IMAGE_VERSION)" \
+          --label org.opencontainers.image.ref.name="$(BRANCH_NAME)" \
+          --label org.opencontainers.image.revision="$(GIT_COMMIT)" \
+          --label org.opencontainers.image.created="$(BUILD_TIME)" \
+          --load \
+          -f apps/frontend/Dockerfile \
+          apps/frontend
 
-              echo "Building Frontend"
-              docker buildx build \
-                --platform $(PLATFORM) \
-                --tag $(DOCKER_USERNAME)/facility-erp-frontend:$(IMAGE_VERSION) \
-                --label org.opencontainers.image.version="$(IMAGE_VERSION)" \
-                --label org.opencontainers.image.ref.name="$(BRANCH_NAME)" \
-                --label org.opencontainers.image.revision="$(GIT_COMMIT)" \
-                --label org.opencontainers.image.created="$(BUILD_TIME)" \
-                --load \
-                -f apps/frontend/Dockerfile \
-                apps/frontend
+        docker push $(DOCKER_USERNAME)/facility-erp-backend:$(IMAGE_VERSION)
+        docker push $(DOCKER_USERNAME)/facility-erp-frontend:$(IMAGE_VERSION)
 
-              docker push $(DOCKER_USERNAME)/facility-erp-backend:$(IMAGE_VERSION)
-              docker push $(DOCKER_USERNAME)/facility-erp-frontend:$(IMAGE_VERSION)
-
-              echo "Docker images pushed successfully"
-
-            env:
-              DOCKER_USERNAME: $(docker_username)
-              DOCKER_PAT: $(docker_pat)
+        echo "Docker images pushed successfully"
+      env:
+        DOCKER_USERNAME: $(docker_username)
+        DOCKER_PAT: $(docker_pat)
