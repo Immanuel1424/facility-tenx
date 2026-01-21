@@ -13,10 +13,6 @@ stages:
 - stage: CI
   displayName: CI – Branch Check, Versioning, Build & Push
   jobs:
-
-  # -------------------------------
-  # Job 1: Branch Check & Resolve Version
-  # -------------------------------
   - job: Branch_Check
     displayName: 'Resolve Image Version'
     pool:
@@ -31,10 +27,9 @@ stages:
         SKIP_CD=false
 
         echo "Branch detected: $BRANCH_NAME"
-        echo "Expected release branch: $RELEASE_BRANCH"
 
         # -------------------------------
-        # Function: Get next version from Docker Hub
+        # Get latest image version from Docker Hub
         # -------------------------------
         get_next_version() {
           echo "Fetching latest Docker image version..."
@@ -59,38 +54,21 @@ stages:
         }
 
         # -------------------------------
-        # Branch logic
+        # Develop branch → constant version
         # -------------------------------
         if [[ "$BRANCH_NAME" == "develop" ]]; then
             IMAGE_VERSION="$DEVELOP_IMAGE_VERSION"
             echo "Develop branch → fixed version $IMAGE_VERSION"
 
+        # -------------------------------
+        # Release branch → auto-increment
+        # -------------------------------
         elif [[ "$BRANCH_NAME" == release/* ]]; then
-            echo "Release branch detected: $BRANCH_NAME"
-
-            if [[ "$BRANCH_NAME" == "$RELEASE_BRANCH" ]]; then
-                echo "Release branch matches variable group value → continue"
-                IMAGE_VERSION="$(get_next_version)"
-                STOP_PIPELINE=false
-                SKIP_CD=false
-                echo "Auto-incremented version: $IMAGE_VERSION"
-
-            elif [[ "$BRANCH_NAME" != "$RELEASE_BRANCH" && "$(Build.Reason)" == "Manual" ]]; then
-                echo "Manual build with release mismatch → skipping CD"
-                IMAGE_VERSION="$(get_next_version)"
-                STOP_PIPELINE=false
-                SKIP_CD=true
-                echo "Auto-incremented version: $IMAGE_VERSION"
-
-            else
-                echo "Automated build with release mismatch → failing pipeline"
-                STOP_PIPELINE=true
-                SKIP_CD=true
-                exit 1
-            fi
+            IMAGE_VERSION="$(get_next_version)"
+            echo "Release branch → auto-incremented version $IMAGE_VERSION"
 
         else
-            echo "❌ Invalid branch → failing pipeline"
+            echo "❌ Invalid branch"
             STOP_PIPELINE=true
             SKIP_CD=true
             exit 1
@@ -109,11 +87,7 @@ stages:
         DOCKER_PAT: $(docker_pat)
         DOCKER_REPO_BACKEND: $(docker_repo_backend)
         DEVELOP_IMAGE_VERSION: $(develop_image_version)
-        RELEASE_BRANCH: $(sprint_release_branch)
 
-  # -------------------------------
-  # Job 2: Docker Build & Push
-  # -------------------------------
   - job: Docker_Build_Push
     displayName: 'Docker Build & Push'
     dependsOn: Branch_Check
@@ -128,18 +102,16 @@ stages:
       BRANCH_NAME: $[ dependencies.Branch_Check.outputs['CheckBranch.BRANCH_NAME'] ]
       GIT_COMMIT: $(Build.SourceVersion)
       PROJECT_NAME: $(Build.Repository.Name)
-      BUILD_TIME: $[format('{0:yyyy-MM-ddTHH:mm:ssZ}', pipeline.startTime)]
     steps:
     - bash: |
         set -e
 
-        echo "Logging into Docker Hub..."
         echo "$(DOCKER_PAT)" | docker login -u "$(DOCKER_USERNAME)" --password-stdin
 
         docker buildx create --name facility-erp-builder --use || true
         docker buildx inspect --bootstrap
 
-        echo "Building Backend image..."
+        echo "Building Backend"
         docker buildx build \
           --platform $(PLATFORM) \
           --tag $(DOCKER_USERNAME)/facility-erp-backend:$(IMAGE_VERSION) \
@@ -151,7 +123,7 @@ stages:
           -f apps/backend/Dockerfile \
           apps/backend
 
-        echo "Building Frontend image..."
+        echo "Building Frontend"
         docker buildx build \
           --platform $(PLATFORM) \
           --tag $(DOCKER_USERNAME)/facility-erp-frontend:$(IMAGE_VERSION) \
@@ -163,12 +135,10 @@ stages:
           -f apps/frontend/Dockerfile \
           apps/frontend
 
-        echo "Pushing Docker images..."
         docker push $(DOCKER_USERNAME)/facility-erp-backend:$(IMAGE_VERSION)
         docker push $(DOCKER_USERNAME)/facility-erp-frontend:$(IMAGE_VERSION)
 
-        echo "✅ Docker images pushed successfully"
+        echo "Docker images pushed successfully"
       env:
         DOCKER_USERNAME: $(docker_username)
         DOCKER_PAT: $(docker_pat)
-
