@@ -13,9 +13,8 @@ stages:
 - stage: CI
   displayName: CI – Branch Check, Versioning, Build & Push
   jobs:
-
   # -------------------------------
-  # Job 1: Branch Check & Resolve Version
+  # Job 1: Branch Check & Version Resolver
   # -------------------------------
   - job: Branch_Check
     displayName: 'Resolve Image Version'
@@ -25,72 +24,73 @@ stages:
     - bash: |
         set -e
 
+        PROJECT="$(echo "$(Build.Repository.Name)" | awk -F'/' '{print $2}')"
         BRANCH_NAME="$(Build.SourceBranchName)"
         IMAGE_VERSION=""
         STOP_PIPELINE=false
         SKIP_CD=false
 
-        echo "Branch detected: $BRANCH_NAME"
-        echo "Expected release branch: $RELEASE_BRANCH"
+        echo "Triggered branch: $BRANCH_NAME"
+        echo "Expected release version: $RELEASE_BRANCH"
+        echo "Project name: $PROJECT"
 
         # -------------------------------
-        # Function: Get next version from Docker Hub
-        # -------------------------------
-        get_next_version() {
-          echo "Fetching latest Docker image version..."
-
-          TAGS=$(curl -s -u "$DOCKER_USERNAME:$DOCKER_PAT" \
-            "https://hub.docker.com/v2/repositories/$DOCKER_USERNAME/$DOCKER_REPO_BACKEND/tags?page_size=100" \
-            | jq -r '.results[].name' \
-            | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' \
-            | sort -V)
-
-          if [[ -z "$TAGS" ]]; then
-            echo "No existing tags found, starting from 1.0.0"
-            echo "1.0.0"
-            return
-          fi
-
-          LATEST=$(echo "$TAGS" | tail -n 1)
-          IFS='.' read -r MAJOR MINOR PATCH <<< "$LATEST"
-          PATCH=$((PATCH + 1))
-
-          echo "$MAJOR.$MINOR.$PATCH"
-        }
-
-        # -------------------------------
-        # Branch logic
+        # Branch detection logic
         # -------------------------------
         if [[ "$BRANCH_NAME" == "develop" ]]; then
+            echo "##[warning] develop branch detected - skipping release check and continuing."
             IMAGE_VERSION="$DEVELOP_IMAGE_VERSION"
-            echo "Develop branch → fixed version $IMAGE_VERSION"
 
         elif [[ "$BRANCH_NAME" == release/* ]]; then
-            echo "Release branch detected: $BRANCH_NAME"
+            CURRENT_RELEASE="$BRANCH_NAME"
+            echo "Release branch detected: $CURRENT_RELEASE"
 
-            if [[ "$BRANCH_NAME" == "$RELEASE_BRANCH" ]]; then
-                echo "Release branch matches variable group value → continue"
-                IMAGE_VERSION="$(get_next_version)"
+            if [[ "$CURRENT_RELEASE" == "$RELEASE_BRANCH" ]]; then
+                echo "Release matches variable group value. Continuing..."
                 STOP_PIPELINE=false
                 SKIP_CD=false
-                echo "Auto-incremented version: $IMAGE_VERSION"
 
-            elif [[ "$BRANCH_NAME" != "$RELEASE_BRANCH" && "$(Build.Reason)" == "Manual" ]]; then
-                echo "Manual build with release mismatch → skipping CD"
-                IMAGE_VERSION="$(get_next_version)"
+            elif [[ "$CURRENT_RELEASE" != "$RELEASE_BRANCH" && "$(Build.Reason)" == "Manual" ]]; then
+                echo "Manual build with release mismatch. Skipping CD trigger job."
                 STOP_PIPELINE=false
                 SKIP_CD=true
-                echo "Auto-incremented version: $IMAGE_VERSION"
 
             else
-                echo "Automated build with release mismatch → failing pipeline"
+                echo "Release mismatch on automated build. Failing pipeline."
                 STOP_PIPELINE=true
                 SKIP_CD=true
                 exit 1
             fi
 
+            # -------------------------------
+            # Get latest image version from Docker Hub (incremental)
+            # -------------------------------
+            get_next_version() {
+              echo "Fetching latest Docker image version from Docker Hub..."
+              TAGS=$(curl -s -u "$DOCKER_USERNAME:$DOCKER_PAT" \
+                "https://hub.docker.com/v2/repositories/$DOCKER_USERNAME/$DOCKER_REPO_BACKEND/tags?page_size=100" \
+                | jq -r '.results[].name' \
+                | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' \
+                | sort -V)
+
+              if [[ -z "$TAGS" ]]; then
+                echo "No existing tags found, starting from 1.0.0"
+                echo "1.0.0"
+                return
+              fi
+
+              LATEST=$(echo "$TAGS" | tail -n 1)
+              IFS='.' read -r MAJOR MINOR PATCH <<< "$LATEST"
+              PATCH=$((PATCH + 1))
+
+              echo "$MAJOR.$MINOR.$PATCH"
+            }
+
+            IMAGE_VERSION="$(get_next_version)"
+            echo "Release branch → auto-incremented version $IMAGE_VERSION"
+
         else
-            echo "❌ Invalid branch → failing pipeline"
+            echo "❌ Invalid branch"
             STOP_PIPELINE=true
             SKIP_CD=true
             exit 1
@@ -98,12 +98,16 @@ stages:
 
         echo "Final image version: $IMAGE_VERSION"
 
+        # -------------------------------
+        # Export variables for downstream jobs
+        # -------------------------------
         echo "##vso[task.setvariable variable=IMAGE_VERSION;isOutput=true]$IMAGE_VERSION"
         echo "##vso[task.setvariable variable=BRANCH_NAME;isOutput=true]$BRANCH_NAME"
         echo "##vso[task.setvariable variable=STOP_PIPELINE;isOutput=true]$STOP_PIPELINE"
         echo "##vso[task.setvariable variable=SKIP_CD;isOutput=true]$SKIP_CD"
       name: CheckBranch
       displayName: 'Branch & Version Resolver'
+      continueOnError: true
       env:
         DOCKER_USERNAME: $(docker_username)
         DOCKER_PAT: $(docker_pat)
@@ -128,18 +132,16 @@ stages:
       BRANCH_NAME: $[ dependencies.Branch_Check.outputs['CheckBranch.BRANCH_NAME'] ]
       GIT_COMMIT: $(Build.SourceVersion)
       PROJECT_NAME: $(Build.Repository.Name)
-      BUILD_TIME: $[format('{0:yyyy-MM-ddTHH:mm:ssZ}', pipeline.startTime)]
     steps:
     - bash: |
         set -e
 
-        echo "Logging into Docker Hub..."
         echo "$(DOCKER_PAT)" | docker login -u "$(DOCKER_USERNAME)" --password-stdin
 
         docker buildx create --name facility-erp-builder --use || true
         docker buildx inspect --bootstrap
 
-        echo "Building Backend image..."
+        echo "Building Backend"
         docker buildx build \
           --platform $(PLATFORM) \
           --tag $(DOCKER_USERNAME)/facility-erp-backend:$(IMAGE_VERSION) \
@@ -151,7 +153,7 @@ stages:
           -f apps/backend/Dockerfile \
           apps/backend
 
-        echo "Building Frontend image..."
+        echo "Building Frontend"
         docker buildx build \
           --platform $(PLATFORM) \
           --tag $(DOCKER_USERNAME)/facility-erp-frontend:$(IMAGE_VERSION) \
@@ -163,11 +165,10 @@ stages:
           -f apps/frontend/Dockerfile \
           apps/frontend
 
-        echo "Pushing Docker images..."
         docker push $(DOCKER_USERNAME)/facility-erp-backend:$(IMAGE_VERSION)
         docker push $(DOCKER_USERNAME)/facility-erp-frontend:$(IMAGE_VERSION)
 
-        echo "✅ Docker images pushed successfully"
+        echo "Docker images pushed successfully"
       env:
         DOCKER_USERNAME: $(docker_username)
         DOCKER_PAT: $(docker_pat)
