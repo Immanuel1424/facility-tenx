@@ -187,25 +187,31 @@ stages:
 
         echo "Building Backend"
         docker buildx build \
-          --platform $(PLATFORM) \
-          --tag $(DOCKER_USERNAME)/facility-erp-backend:$(IMAGE_VERSION) \
-          --label org.opencontainers.image.version="$(IMAGE_VERSION)" \
-          --label org.opencontainers.image.ref.name="$(BRANCH_NAME)" \
-          --label org.opencontainers.image.revision="$(GIT_COMMIT)" \
+          --platform "$PLATFORM" \
+          --tag "$DOCKER_USERNAME/facility-erp-backend:$IMAGE_VERSION" \
+          --label org.opencontainers.image.version="$IMAGE_VERSION" \
+          --label org.opencontainers.image.ref.name="$BRANCH_NAME" \
+          --label org.opencontainers.image.revision="$GIT_COMMIT" \
+          --label org.opencontainers.image.created="$BUILD_TIME" \
           --load \
           -f apps/backend/Dockerfile \
           apps/backend
 
         echo "Building Frontend"
         docker buildx build \
-          --platform $(PLATFORM) \
-          --tag $(DOCKER_USERNAME)/facility-erp-frontend:$(IMAGE_VERSION) \
-          --label org.opencontainers.image.version="$(IMAGE_VERSION)" \
-          --label org.opencontainers.image.ref.name="$(BRANCH_NAME)" \
-          --label org.opencontainers.image.revision="$(GIT_COMMIT)" \
+          --platform "$PLATFORM" \
+          --tag "$DOCKER_USERNAME/facility-erp-frontend:$IMAGE_VERSION" \
+          --label org.opencontainers.image.version="$IMAGE_VERSION" \
+          --label org.opencontainers.image.ref.name="$BRANCH_NAME" \
+          --label org.opencontainers.image.revision="$GIT_COMMIT" \
+          --label org.opencontainers.image.created="$BUILD_TIME" \
           --load \
           -f apps/frontend/Dockerfile \
           apps/frontend
+
+        echo "Docker build completed"
+
+
 
         docker push $(DOCKER_USERNAME)/facility-erp-backend:$(IMAGE_VERSION)
         docker push $(DOCKER_USERNAME)/facility-erp-frontend:$(IMAGE_VERSION)
