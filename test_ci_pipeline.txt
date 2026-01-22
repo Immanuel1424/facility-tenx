@@ -1,144 +1,216 @@
 trigger:
   branches:
     include:
-    - develop
-    - release/*
+      - develop
+      - release/*
 
 variables:
-- group: facility-erp-ci-vars
-- name: PLATFORM
-  value: linux/amd64
+  - group: facility-erp-ci-vars
+  - name: PLATFORM
+    value: linux/amd64
 
 stages:
-- stage: CI
-  displayName: CI – Branch Check, Versioning, Build & Push
-  jobs:
-  - job: Branch_Check
-    displayName: 'Resolve Image Version'
-    pool:
-      name: 'test-one'
-    steps:
-    - bash: |
-        set -e
+  - stage: CI
+    displayName: CI – Branch Check, Versioning, Build & Push
+    jobs:
+      # -------------------------------
+      # Job 1: Branch Check
+      # -------------------------------
+      - job: Branch_Check
+        displayName: 'Branch Validation'
+        pool:
+          name: 'test-one'
+        steps:
+          - bash: |
+              set -e
 
-        BRANCH_NAME="$(Build.SourceBranchName)"
-        IMAGE_VERSION=""
-        STOP_PIPELINE=false
-        SKIP_CD=false
+              PROJECT="$(echo "$(Build.Repository.Name)" | awk -F'/' '{print $2}')"
+              BRANCH="$(echo "$(Build.SourceBranch)" | cut -d '/' -f 3- )"
+              STOP_PIPELINE=false
+              SKIP_CD=false
 
-        echo "Branch detected: $BRANCH_NAME"
+              echo "Triggered branch: $BRANCH"
+              echo "Project name: $PROJECT"
 
-        # -------------------------------
-        # Get latest image version from Docker Hub
-        # -------------------------------
-        get_next_version() {
-          echo "Fetching latest Docker image version..."
+              # -------------------------------
+              # Branch detection logic
+              # -------------------------------
+              if [[ "$BRANCH" == "developv3" ]]; then
+                  echo "Develop branch detected"
+                  echo "##[warning] develop branch detected - skipping release check and continuing."
+                  STOP_PIPELINE=false
+                  SKIP_CD=false
 
-          TAGS=$(curl -s -u "$DOCKER_USERNAME:$DOCKER_PAT" \
-            "https://hub.docker.com/v2/repositories/$DOCKER_USERNAME/$DOCKER_REPO_BACKEND/tags?page_size=100" \
-            | jq -r '.results[].name' \
-            | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' \
-            | sort -V)
+              elif [[ "$BRANCH" == release/* ]]; then
+                  CURRENT_RELEASE="$BRANCH"
+                  echo "Release branch detected: $CURRENT_RELEASE"
 
-          if [[ -z "$TAGS" ]]; then
-            echo "No existing tags found, starting from 1.0.0"
-            echo "1.0.0"
-            return
-          fi
+                  # Case 1: Release matches → allow CD
+                  if [[ "$CURRENT_RELEASE" == "$RELEASE_BRANCH" ]]; then
+                      echo "Release matches variable group value. Continuing..."
+                      STOP_PIPELINE=false
+                      SKIP_CD=false
 
-          LATEST=$(echo "$TAGS" | tail -n 1)
-          IFS='.' read -r MAJOR MINOR PATCH <<< "$LATEST"
-          PATCH=$((PATCH + 1))
+                  # Case 2: Release mismatch BUT Manual build → skip CD job
+                  elif [[ "$CURRENT_RELEASE" != "$RELEASE_BRANCH" && "$(Build.Reason)" == "Manual" ]]; then
+                      echo "Manual build with release mismatch. Skipping CD trigger job."
+                      STOP_PIPELINE=false
+                      SKIP_CD=true
 
-          echo "$MAJOR.$MINOR.$PATCH"
-        }
+                  else
+                      echo "Release mismatch on automated build. Failing pipeline."
+                      STOP_PIPELINE=true
+                      SKIP_CD=true
+                      exit 1
+                  fi
 
-        # -------------------------------
-        # Develop branch → constant version
-        # -------------------------------
-        if [[ "$BRANCH_NAME" == "develop" ]]; then
-            IMAGE_VERSION="$DEVELOP_IMAGE_VERSION"
-            echo "Develop branch → fixed version $IMAGE_VERSION"
+              else
+                  echo "Release mismatch on automated build. Failing pipeline."
+                  STOP_PIPELINE=true
+                  SKIP_CD=true
+                  exit 1
+              fi
 
-        # -------------------------------
-        # Release branch → auto-increment
-        # -------------------------------
-        elif [[ "$BRANCH_NAME" == release/* ]]; then
-            IMAGE_VERSION="$(get_next_version)"
-            echo "Release branch → auto-incremented version $IMAGE_VERSION"
+              # -------------------------------
+              # Export variables for downstream jobs
+              # -------------------------------
+              echo "##vso[task.setvariable variable=BRANCH_NAME;isOutput=true]$BRANCH"
+              echo "##vso[task.setvariable variable=STOP_PIPELINE;isOutput=true]$STOP_PIPELINE"
+              echo "##vso[task.setvariable variable=SKIP_CD;isOutput=true]$SKIP_CD"
+            name: CheckBranch
+            displayName: 'Branch Validation'
+            continueOnError: true
+            env:
+              RELEASE_BRANCH: $(sprint_release_branch)
 
-        else
-            echo "❌ Invalid branch"
-            STOP_PIPELINE=true
-            SKIP_CD=true
-            exit 1
-        fi
+      # -------------------------------
+      # Job 2: Version Resolver
+      # -------------------------------
+      - job: Version_Resolver
+        displayName: 'Image Version Resolver'
+        dependsOn: Branch_Check
+        pool:
+          name: 'test-one'
+        condition: and(
+          succeeded(),
+          eq(dependencies.Branch_Check.outputs['CheckBranch.STOP_PIPELINE'], 'false'),
+          eq(dependencies.Branch_Check.outputs['CheckBranch.SKIP_CD'], 'false'))
+        variables:
+          BRANCH: $[ dependencies.Branch_Check.outputs['CheckBranch.BRANCH_NAME'] ]
+        steps:
+          - bash: |
+              set -e
 
-        echo "Final image version: $IMAGE_VERSION"
+              echo "Branch from previous job: $BRANCH"
+              IMAGE_VERSION=""
 
-        echo "##vso[task.setvariable variable=IMAGE_VERSION;isOutput=true]$IMAGE_VERSION"
-        echo "##vso[task.setvariable variable=BRANCH_NAME;isOutput=true]$BRANCH_NAME"
-        echo "##vso[task.setvariable variable=STOP_PIPELINE;isOutput=true]$STOP_PIPELINE"
-        echo "##vso[task.setvariable variable=SKIP_CD;isOutput=true]$SKIP_CD"
-      name: CheckBranch
-      displayName: 'Branch & Version Resolver'
-      env:
-        DOCKER_USERNAME: $(docker_username)
-        DOCKER_PAT: $(docker_pat)
-        DOCKER_REPO_BACKEND: $(docker_repo_backend)
-        DEVELOP_IMAGE_VERSION: $(develop_image_version)
+              # -------------------------------
+              # Get latest image version from Docker Hub (incremental)
+              # -------------------------------
+              get_next_version() {
+                echo "Fetching latest Docker image version..." >&2
 
-  - job: Docker_Build_Push
-    displayName: 'Docker Build & Push'
-    dependsOn: Branch_Check
-    pool:
-      name: 'test-one'
-    condition: and(
-      succeeded(),
-      eq(dependencies.Branch_Check.outputs['CheckBranch.STOP_PIPELINE'], 'false'),
-      eq(dependencies.Branch_Check.outputs['CheckBranch.SKIP_CD'], 'false'))
-    variables:
-      IMAGE_VERSION: $[ dependencies.Branch_Check.outputs['CheckBranch.IMAGE_VERSION'] ]
-      BRANCH_NAME: $[ dependencies.Branch_Check.outputs['CheckBranch.BRANCH_NAME'] ]
-      GIT_COMMIT: $(Build.SourceVersion)
-      PROJECT_NAME: $(Build.Repository.Name)
-    steps:
-    - bash: |
-        set -e
+                TAGS=$(curl -s -u "$DOCKER_USERNAME:$DOCKER_PAT" \
+                  "https://hub.docker.com/v2/repositories/$DOCKER_USERNAME/$DOCKER_REPO_BACKEND/tags?page_size=100" \
+                  | jq -r '.results[].name' \
+                  | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' \
+                  | sort -V)
 
-        echo "$(DOCKER_PAT)" | docker login -u "$(DOCKER_USERNAME)" --password-stdin
+                if [[ -z "$TAGS" ]]; then
+                  echo "No existing tags found, starting from 1.0.0" >&2
+                  echo "1.0.0"
+                  return
+                fi
 
-        docker buildx create --name facility-erp-builder --use || true
-        docker buildx inspect --bootstrap
+                LATEST=$(echo "$TAGS" | tail -n 1)
+                IFS='.' read -r MAJOR MINOR PATCH <<< "$LATEST"
+                PATCH=$((PATCH + 1))
 
-        echo "Building Backend"
-        docker buildx build \
-          --platform $(PLATFORM) \
-          --tag $(DOCKER_USERNAME)/facility-erp-backend:$(IMAGE_VERSION) \
-          --label org.opencontainers.image.version="$(IMAGE_VERSION)" \
-          --label org.opencontainers.image.ref.name="$(BRANCH_NAME)" \
-          --label org.opencontainers.image.revision="$(GIT_COMMIT)" \
-          --label org.opencontainers.image.created="$(BUILD_TIME)" \
-          --load \
-          -f apps/backend/Dockerfile \
-          apps/backend
+                echo "$MAJOR.$MINOR.$PATCH"
+              }
 
-        echo "Building Frontend"
-        docker buildx build \
-          --platform $(PLATFORM) \
-          --tag $(DOCKER_USERNAME)/facility-erp-frontend:$(IMAGE_VERSION) \
-          --label org.opencontainers.image.version="$(IMAGE_VERSION)" \
-          --label org.opencontainers.image.ref.name="$(BRANCH_NAME)" \
-          --label org.opencontainers.image.revision="$(GIT_COMMIT)" \
-          --label org.opencontainers.image.created="$(BUILD_TIME)" \
-          --load \
-          -f apps/frontend/Dockerfile \
-          apps/frontend
+              # -------------------------------
+              # Version assignment logic
+              # -------------------------------
+              if [[ "$BRANCH" == "developv3" ]]; then
+                  IMAGE_VERSION="$DEVELOP_IMAGE_VERSION"
+                  echo "Develop branch → fixed version $IMAGE_VERSION"
 
-        docker push $(DOCKER_USERNAME)/facility-erp-backend:$(IMAGE_VERSION)
-        docker push $(DOCKER_USERNAME)/facility-erp-frontend:$(IMAGE_VERSION)
+              elif [[ "$BRANCH" == release/* ]]; then
+                  NEXT_VERSION="$(get_next_version)"
+                  IMAGE_VERSION="$NEXT_VERSION"
+                  echo "Release branch → auto-incremented version $IMAGE_VERSION"
 
-        echo "Docker images pushed successfully"
-      env:
-        DOCKER_USERNAME: $(docker_username)
-        DOCKER_PAT: $(docker_pat)
+              else
+                  echo "❌ Invalid branch"
+                  exit 1
+              fi
+
+              echo "Final image version: $IMAGE_VERSION"
+
+              # -------------------------------
+              # Export variables for downstream jobs
+              # -------------------------------
+              echo "##vso[task.setvariable variable=IMAGE_VERSION;isOutput=true]$IMAGE_VERSION"
+            name: VersionResolver
+            displayName: 'Image Version Resolver'
+            env:
+              DOCKER_USERNAME: $(docker_username)
+              DOCKER_PAT: $(docker_pat)
+              DOCKER_REPO_BACKEND: $(docker_repo_backend)
+              DEVELOP_IMAGE_VERSION: $(develop_image_version)
+
+      # -------------------------------
+      # Job 3: Docker Build & Push
+      # -------------------------------
+      - job: Docker_Build_Push
+        displayName: 'Docker Build & Push'
+        dependsOn: Version_Resolver
+        pool:
+          name: 'test-one'
+        condition: and(
+          succeeded(),
+          eq(dependencies.Branch_Check.outputs['CheckBranch.STOP_PIPELINE'], 'false'),
+          eq(dependencies.Branch_Check.outputs['CheckBranch.SKIP_CD'], 'false'))
+        variables:
+          IMAGE_VERSION: $[ dependencies.Version_Resolver.outputs['VersionResolver.IMAGE_VERSION'] ]
+          BRANCH_NAME: $[ dependencies.Branch_Check.outputs['CheckBranch.BRANCH_NAME'] ]
+          GIT_COMMIT: $(Build.SourceVersion)
+          PROJECT_NAME: $(Build.Repository.Name)
+        steps:
+          - bash: |
+              set -e
+
+              echo "$(DOCKER_PAT)" | docker login -u "$(DOCKER_USERNAME)" --password-stdin
+
+              docker buildx create --name facility-erp-builder --use || true
+              docker buildx inspect --bootstrap
+
+              echo "Building Backend with tag: $(DOCKER_USERNAME)/facility-erp-backend:$(IMAGE_VERSION)"
+              docker buildx build \
+                --platform $(PLATFORM) \
+                --tag $(DOCKER_USERNAME)/facility-erp-backend:$(IMAGE_VERSION) \
+                --label org.opencontainers.image.version="$(IMAGE_VERSION)" \
+                --label org.opencontainers.image.ref.name="$(BRANCH_NAME)" \
+                --label org.opencontainers.image.revision="$(GIT_COMMIT)" \
+                --load \
+                -f apps/backend/Dockerfile \
+                apps/backend
+
+              echo "Building Frontend with tag: $(DOCKER_USERNAME)/facility-erp-frontend:$(IMAGE_VERSION)"
+              docker buildx build \
+                --platform $(PLATFORM) \
+                --tag $(DOCKER_USERNAME)/facility-erp-frontend:$(IMAGE_VERSION) \
+                --label org.opencontainers.image.version="$(IMAGE_VERSION)" \
+                --label org.opencontainers.image.ref.name="$(BRANCH_NAME)" \
+                --label org.opencontainers.image.revision="$(GIT_COMMIT)" \
+                --load \
+                -f apps/frontend/Dockerfile \
+                apps/frontend
+
+              docker push $(DOCKER_USERNAME)/facility-erp-backend:$(IMAGE_VERSION)
+              docker push $(DOCKER_USERNAME)/facility-erp-frontend:$(IMAGE_VERSION)
+            env:
+              DOCKER_USERNAME: $(docker_username)
+              DOCKER_PAT: $(docker_pat)
+
