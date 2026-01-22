@@ -35,7 +35,7 @@ stages:
         # -------------------------------
         # Branch detection logic
         # -------------------------------
-        if [[ "$BRANCH" == "developv3" ]]; then
+        if [[ "$BRANCH" == "develop" ]]; then
             echo "Develop branch detected"
             echo "##[warning] develop branch detected - skipping release check and continuing."
             STOP_PIPELINE=false
@@ -134,7 +134,7 @@ stages:
         # -------------------------------
         # Version assignment logic
         # -------------------------------
-        if [[ "$BRANCH" == "developv3" ]]; then
+        if [[ "$BRANCH" == "develop" ]]; then
             IMAGE_VERSION="$DEVELOP_IMAGE_VERSION"
             echo "Develop branch → fixed version $IMAGE_VERSION"
 
@@ -180,6 +180,9 @@ stages:
     steps:
     - bash: |
         set -e
+         # Generate current timestamp
+        CURRENT_TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+        echo "Build timestamp: $CURRENT_TIMESTAMP"
 
         echo "$(DOCKER_PAT)" | docker login -u "$(DOCKER_USERNAME)" --password-stdin
 
@@ -193,7 +196,7 @@ stages:
           --label org.opencontainers.image.version="$(IMAGE_VERSION)" \
           --label org.opencontainers.image.ref.name="$(BRANCH_NAME)" \
           --label org.opencontainers.image.revision="$(GIT_COMMIT)" \
-          --label org.opencontainers.image.created="$(Date:yyyy-MM-ddTHH:mm:ssZ)" \
+          --label org.opencontainers.image.created="$(CURRENT_TIMESTAMP)" \
           --load \
           -f apps/backend/Dockerfile \
           apps/backend
@@ -205,7 +208,7 @@ stages:
           --label org.opencontainers.image.version="$(IMAGE_VERSION)" \
           --label org.opencontainers.image.ref.name="$(BRANCH_NAME)" \
           --label org.opencontainers.image.revision="$(GIT_COMMIT)" \
-          --label org.opencontainers.image.created="$(Date:yyyy-MM-ddTHH:mm:ssZ)" \
+          --label org.opencontainers.image.created="$(CURRENT_TIMESTAMP)" \
           --load \
           -f apps/frontend/Dockerfile \
           apps/frontend
