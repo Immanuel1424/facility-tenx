@@ -35,7 +35,7 @@ stages:
         # -------------------------------
         # Branch detection logic
         # -------------------------------
-        if [[ "$BRANCH" == "develop" ]]; then
+        if [[ "$BRANCH" == "developv3" ]]; then
             echo "Develop branch detected"
             echo "##[warning] develop branch detected - skipping release check and continuing."
             STOP_PIPELINE=false
@@ -110,7 +110,7 @@ stages:
         # Get latest image version from Docker Hub (incremental)
         # -------------------------------
         get_next_version() {
-          echo "Fetching latest Docker image version..."
+          echo "Fetching latest Docker image version..." >&2
 
           TAGS=$(curl -s -u "$DOCKER_USERNAME:$DOCKER_PAT" \
             "https://hub.docker.com/v2/repositories/$DOCKER_USERNAME/$DOCKER_REPO_BACKEND/tags?page_size=100" \
@@ -119,7 +119,7 @@ stages:
             | sort -V)
 
           if [[ -z "$TAGS" ]]; then
-            echo "No existing tags found, starting from 1.0.0"
+            echo "No existing tags found, starting from 1.0.0" >&2
             echo "1.0.0"
             return
           fi
@@ -134,13 +134,14 @@ stages:
         # -------------------------------
         # Version assignment logic
         # -------------------------------
-        if [[ "$BRANCH" == "develop" ]]; then
+        if [[ "$BRANCH" == "developv3" ]]; then
             IMAGE_VERSION="$DEVELOP_IMAGE_VERSION"
             echo "Develop branch → fixed version $IMAGE_VERSION"
 
         # Release branch → auto-increment
         elif [[ "$BRANCH" == release/* ]]; then
-            IMAGE_VERSION="$(get_next_version)"
+            NEXT_VERSION="$(get_next_version)"
+            IMAGE_VERSION="$NEXT_VERSION"
             echo "Release branch → auto-incremented version $IMAGE_VERSION"
 
         else
@@ -185,33 +186,29 @@ stages:
         docker buildx create --name facility-erp-builder --use || true
         docker buildx inspect --bootstrap
 
-        echo "Building Backend"
+        echo "Building Backend with tag: $(DOCKER_USERNAME)/facility-erp-backend:$(IMAGE_VERSION)"
         docker buildx build \
-          --platform "$PLATFORM" \
-          --tag "$DOCKER_USERNAME/facility-erp-backend:$IMAGE_VERSION" \
-          --label org.opencontainers.image.version="$IMAGE_VERSION" \
-          --label org.opencontainers.image.ref.name="$BRANCH_NAME" \
-          --label org.opencontainers.image.revision="$GIT_COMMIT" \
-          --label org.opencontainers.image.created="$BUILD_TIME" \
+          --platform $(PLATFORM) \
+          --tag $(DOCKER_USERNAME)/facility-erp-backend:$(IMAGE_VERSION) \
+          --label org.opencontainers.image.version="$(IMAGE_VERSION)" \
+          --label org.opencontainers.image.ref.name="$(BRANCH_NAME)" \
+          --label org.opencontainers.image.revision="$(GIT_COMMIT)" \
+          --label org.opencontainers.image.created="$(Date:yyyy-MM-ddTHH:mm:ssZ)" \
           --load \
           -f apps/backend/Dockerfile \
           apps/backend
 
-        echo "Building Frontend"
+        echo "Building Frontend with tag: $(DOCKER_USERNAME)/facility-erp-frontend:$(IMAGE_VERSION)"
         docker buildx build \
-          --platform "$PLATFORM" \
-          --tag "$DOCKER_USERNAME/facility-erp-frontend:$IMAGE_VERSION" \
-          --label org.opencontainers.image.version="$IMAGE_VERSION" \
-          --label org.opencontainers.image.ref.name="$BRANCH_NAME" \
-          --label org.opencontainers.image.revision="$GIT_COMMIT" \
-          --label org.opencontainers.image.created="$BUILD_TIME" \
+          --platform $(PLATFORM) \
+          --tag $(DOCKER_USERNAME)/facility-erp-frontend:$(IMAGE_VERSION) \
+          --label org.opencontainers.image.version="$(IMAGE_VERSION)" \
+          --label org.opencontainers.image.ref.name="$(BRANCH_NAME)" \
+          --label org.opencontainers.image.revision="$(GIT_COMMIT)" \
+          --label org.opencontainers.image.created="$(Date:yyyy-MM-ddTHH:mm:ssZ)" \
           --load \
           -f apps/frontend/Dockerfile \
           apps/frontend
-
-        echo "Docker build completed"
-
-
 
         docker push $(DOCKER_USERNAME)/facility-erp-backend:$(IMAGE_VERSION)
         docker push $(DOCKER_USERNAME)/facility-erp-frontend:$(IMAGE_VERSION)
