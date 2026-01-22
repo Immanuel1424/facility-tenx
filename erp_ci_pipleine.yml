@@ -8,8 +8,6 @@ variables:
 - group: facility-erp-ci-vars
 - name: PLATFORM
   value: linux/amd64
-- name: BUILD_TIMESTAMP
-  value: $[format('{0:yyyy-MM-ddTHH:mm:ssZ}', pipeline.startTime)]
 
 stages:
 - stage: CI
