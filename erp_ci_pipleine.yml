@@ -183,10 +183,6 @@ stages:
     - bash: |
         set -e
         
-        # Generate current timestamp
-        CURRENT_TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-        echo "Build timestamp: $CURRENT_TIMESTAMP"
-
         echo "$(DOCKER_PAT)" | docker login -u "$(DOCKER_USERNAME)" --password-stdin
 
         # Setup Docker Buildx with better configuration
@@ -205,7 +201,6 @@ stages:
           --label org.opencontainers.image.version="$(IMAGE_VERSION)" \
           --label org.opencontainers.image.ref.name="$(BRANCH_NAME)" \
           --label org.opencontainers.image.revision="$(GIT_COMMIT)" \
-          --label org.opencontainers.image.created="$CURRENT_TIMESTAMP" \
           --load \
           -f apps/backend/Dockerfile \
           apps/backend
@@ -217,7 +212,6 @@ stages:
           --label org.opencontainers.image.version="$(IMAGE_VERSION)" \
           --label org.opencontainers.image.ref.name="$(BRANCH_NAME)" \
           --label org.opencontainers.image.revision="$(GIT_COMMIT)" \
-          --label org.opencontainers.image.created="$CURRENT_TIMESTAMP" \
           --load \
           -f apps/frontend/Dockerfile \
           apps/frontend
