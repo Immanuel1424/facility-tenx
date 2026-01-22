@@ -8,6 +8,8 @@ variables:
 - group: facility-erp-ci-vars
 - name: PLATFORM
   value: linux/amd64
+- name: BUILD_TIMESTAMP
+  value: $[format('{0:yyyy-MM-ddTHH:mm:ssZ}', pipeline.startTime)]
 
 stages:
 - stage: CI
@@ -180,14 +182,21 @@ stages:
     steps:
     - bash: |
         set -e
-         # Generate current timestamp
+        
+        # Generate current timestamp
         CURRENT_TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
         echo "Build timestamp: $CURRENT_TIMESTAMP"
 
         echo "$(DOCKER_PAT)" | docker login -u "$(DOCKER_USERNAME)" --password-stdin
 
-        docker buildx create --name facility-erp-builder --use || true
+        # Setup Docker Buildx with better configuration
+        docker buildx create --name facility-erp-builder --driver docker-container --use || true
         docker buildx inspect --bootstrap
+        docker buildx ls
+        
+        # Verify Docker connectivity
+        echo "Testing Docker connectivity..."
+        docker pull --platform $(PLATFORM) alpine:latest 2>/dev/null || true
 
         echo "Building Backend with tag: $(DOCKER_USERNAME)/facility-erp-backend:$(IMAGE_VERSION)"
         docker buildx build \
@@ -196,7 +205,7 @@ stages:
           --label org.opencontainers.image.version="$(IMAGE_VERSION)" \
           --label org.opencontainers.image.ref.name="$(BRANCH_NAME)" \
           --label org.opencontainers.image.revision="$(GIT_COMMIT)" \
-          --label org.opencontainers.image.created="$(CURRENT_TIMESTAMP)" \
+          --label org.opencontainers.image.created="$CURRENT_TIMESTAMP" \
           --load \
           -f apps/backend/Dockerfile \
           apps/backend
@@ -208,7 +217,7 @@ stages:
           --label org.opencontainers.image.version="$(IMAGE_VERSION)" \
           --label org.opencontainers.image.ref.name="$(BRANCH_NAME)" \
           --label org.opencontainers.image.revision="$(GIT_COMMIT)" \
-          --label org.opencontainers.image.created="$(CURRENT_TIMESTAMP)" \
+          --label org.opencontainers.image.created="$CURRENT_TIMESTAMP" \
           --load \
           -f apps/frontend/Dockerfile \
           apps/frontend
